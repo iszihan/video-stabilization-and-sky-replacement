@@ -47,7 +47,8 @@ static char options[] =
 "  -blur<real:sigma>\n"
 "  -sharpen \n"
 "  -matchTranslation <file:other_image>\n"
-"  -RANSAC <file:other_image>\n"
+"  -RANSACP <file:other_image>\n"
+"  -RANSACT <file:other_image>\n"
 "  -matchHomography <file:other_image>\n"
 "  -video\n"
 "  -videostabilization <real:sigma>\n";
@@ -156,6 +157,10 @@ main(int argc, char **argv)
       char mainFilename[100];
       char currentFilename[100];
       char currentOutputFilename[100];
+      double dxList[150];
+      double dyList[150];
+
+      
       if (!mainImage) {
 	fprintf(stderr, "Unable to allocate image\n");
 	exit(-1);
@@ -173,12 +178,11 @@ main(int argc, char **argv)
 
       // =============== VIDEO PROCESSING ===============
 
-      
-      mainImage->featureDetect();
+      //mainImage->featureDetect();
       //mainImage->Write(currentOutputFilename);
       //here you could call mainImage->FirstFrameProcessing( ); 
 		
-      int end = 197;
+      int end = 5;
       for (int i = 1; i < end; i++)
 	{
 	  /* 
@@ -206,22 +210,25 @@ main(int argc, char **argv)
 	    exit(-1);
 	  }
 
-	  currentImage->Brighten((float)i/(float)end);
-	  // here you could call 
-	  //mainImage->blendOtherImageHomography(currentImage); 
-	  // where FrameProcessing would process the current input currentImage, as well as writing the output to currentImage
-
-	  //write result to file
-	  //mainImage->Write(currentOutputFilename);
+	  //process frames
+	  double result[2];
+	  mainImage->RansacT(currentImage,result);
+	  dxList[i-1]=result[0]; //store the corresponding dx,dy 
+	  dyList[i-1]=result[1];
 	  
-	  ///*
+	  //write result to file	 
 	  if (!currentImage->Write(currentOutputFilename)) {
 	    fprintf(stderr, "Unable to write %s\n", currentOutputFilename);
 	    exit(-1);
 	  }
 	  //*/
+	  mainImage = currentImage;
 	  delete currentImage;
 	}
+      
+      for(int i=0;i<150;i++){
+	printf("dx=%f, dy=%f",dxList[i],dyList[i]);
+      }
       delete mainImage;
       
       // Return success
@@ -300,11 +307,11 @@ main(int argc, char **argv)
       image->blendOtherImageTranslated(other_image);
       delete other_image;
     }
-    else if (!strcmp(*argv, "-RANSAC")) {
+    else if (!strcmp(*argv, "-RANSACP")) {
       CheckOption(*argv, argc, 2);
       R2Image *other_image = new R2Image(argv[1]);
       argv += 2, argc -= 2;
-      image->Ransac(other_image);
+      image->RansacP(other_image);
       delete other_image;
     }
     else if (!strcmp(*argv, "-matchHomography")) {
