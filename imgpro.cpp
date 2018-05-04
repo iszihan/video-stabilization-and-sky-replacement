@@ -229,8 +229,45 @@ main(int argc, char **argv)
       for(int i=0;i<150;i++){
 	printf("dx=%f, dy=%f",dxList[i],dyList[i]);
       }
-      delete mainImage;
+
       
+      //smooth the dx-dy curve
+      double dxSum = 0;
+      double dySum = 0;
+      for(int i=0;i<end;i++){
+	dxSum += dxList[i];
+	dySum += dyList[i];
+      }
+      double avgdx = dxSum/end;
+      double avgdy = dySum/end;
+
+     
+     
+
+      for(int i=1;i<end;i++){
+
+	double difx= avgdx-dxList[i-1];
+	double dify= avgdy-dyList[i-1]; //generate the new transform dx,dy;
+        R2Image *currentImage = new R2Image();
+	if (!currentImage) {
+	  fprintf(stderr, "Unable to allocate image %d\n",i);
+	  exit(-1);
+	}
+
+	sprintf(currentFilename, inputName, i);
+	sprintf(currentOutputFilename, outputName, i);
+	printf("Retransform file %s\n", currentFilename);
+	  if (!currentImage->Read(currentFilename)) {
+	    fprintf(stderr, "Unable to read image %d\n", i);
+	    exit(-1);
+	  }
+	  currentImage->Translate(difx,dify);
+	  if (!currentImage->Write(currentOutputFilename)) {
+	    fprintf(stderr, "Unable to write %s\n", currentOutputFilename);
+	    exit(-1);
+	  }
+	  delete currentImage;
+      }
       // Return success
       return EXIT_SUCCESS;
     }

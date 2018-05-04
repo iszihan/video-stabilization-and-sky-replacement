@@ -62,6 +62,7 @@ class R2Image {
   // Per-pixel operations
   void Brighten(double factor);
   void ChangeSaturation(double factor);
+  void Translate(double dx, double dy);
 
   // show how SVD works
  void svdTest();
