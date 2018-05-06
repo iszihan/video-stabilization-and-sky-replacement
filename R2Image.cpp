@@ -270,9 +270,9 @@ Translate(double dx, double dy){
   
   for( int i=0; i<width;i++){
     for(int j=0; j<height;j++){
-      if(i+dx<width && i+dx>0 && j+dy<height && j+dy>0)
+      if(i-dx<width && i-dx>0 && j-dy<height && j-dy>0)
 	{
-	  Pixel(i,j)=Temp.Pixel(i+dx,j+dy);
+	  Pixel(i,j)=Temp.Pixel(i-dx,j-dy);
 	}
       else{
 	Pixel(i,j)=R2black_pixel;
@@ -541,12 +541,13 @@ Blur(double sigma)
       Temp.Pixel(i,j).SetRed(0);
       Temp.Pixel(i,j).SetGreen(0);
       Temp.Pixel(i,j).SetBlue(0);
+      
       for(int ly=-r;ly<=r;ly++){
 	if(j+ly<0){ //edge processing
-	  Temp.Pixel(i,j) += Pixel(i,j-ly)*kernel[ly+r][0];
+	  Temp.Pixel(i,j) += Pixel(i,-j-ly)*kernel[ly+r][0];
 	}else{
 	  if(j+ly>=height){ //edge processing
-	    Temp.Pixel(i,j) += Pixel(i,-j-ly)*kernel[ly+r][0];
+	    Temp.Pixel(i,j) += Pixel(i,2*height-1-j-ly)*kernel[ly+r][0];
 	  }else{
 	    Temp.Pixel(i,j) += Pixel(i,j+ly)*kernel[ly+r][0];
 	  }
@@ -560,12 +561,13 @@ Blur(double sigma)
       Pixel(i,j).SetRed(0);
       Pixel(i,j).SetGreen(0);
       Pixel(i,j).SetBlue(0);
+      
       for(int lx=-r;lx<=r;lx++){
 	if(i+lx<0){ //edge
-	  Pixel(i,j) += Temp.Pixel(i-lx,j)*kernel[lx+r][0];
+	  Pixel(i,j) += Temp.Pixel(-i-lx,j)*kernel[lx+r][0];
 	}else{
 	  if(i+lx>=width){//edge
-	    Pixel(i,j) += Temp.Pixel(-i-lx,j)*kernel[lx+r][0];
+	    Pixel(i,j) += Temp.Pixel(2*width-1-i-lx,j)*kernel[lx+r][0];
 	  }
 	  else{
 	    Pixel(i,j) += Temp.Pixel(i+lx,j)*kernel[lx+r][0];
@@ -875,9 +877,8 @@ blendOtherImageTranslated(R2Image * otherImage)
 }
 
 
-
 void R2Image::
-RansacT(R2Image * otherImage, double result[2])
+Ransac(R2Image * otherImage)
 {
  
   R2Image Temp1(*this);//for feature search
@@ -886,10 +887,10 @@ RansacT(R2Image * otherImage, double result[2])
   R2Pixel red(255,0,0,1);
   R2Pixel green(0,255,0,1);
   
-  Temp1.Harris(1.5);
+  Temp1.Harris(2);
   
   int feature[5][150];//store the coordinates of the features on image1 and the matching features in the other image
-  memset(feature,0,sizeof(int)*4*150);//set all array values to zero
+  memset(feature,0,sizeof(int)*5*150);//set all array values to zero
   float max;
   int max_x,max_y;
   
@@ -1017,8 +1018,188 @@ RansacT(R2Image * otherImage, double result[2])
   }
   
   
-  result[0] = feature[2][target]-feature[0][target];
+  //result[0] = feature[2][target]-feature[0][target]; //store dx,dy to result;
+  //result[1] = feature[3][target]-feature[1][target];
+
+  
+  x1 = feature[2][target]-feature[0][target]; //store dx,dy to result;
+  y1 = feature[3][target]-feature[1][target];
+
+
+  
+  //cout<<"target:"<<target;
+  
+  for(int z=0;z<150;z++){//redraw the translation line
+    x2 = feature[2][z]-feature[0][z];
+    y2 = feature[3][z]-feature[1][z];
+    sim =sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
+    cout<<sim<<' ';
+    if(sim<=6){
+      this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],0,255,0);//draw the matching lines
+    }
+    else{
+      for(int h1=-5;h1<=5;h1++){
+	for(int h2=-5;h2<=5;h2++){
+	  Pixel(feature[0][z]+h1,feature[1][z]+h2)=red;//draw filled boxes around these outliers
+	}
+      }
+      this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],255,0,0);//draw the matching lines
+    }
+  }
+  
+}
+
+
+
+void R2Image::
+RansacT(R2Image * otherImage, double result[2])
+{
+ 
+  R2Image Temp1(*this);//for feature search
+  R2Image Temp2(*this);//keep original image
+  R2Pixel black(0,0,0,1);
+  R2Pixel red(255,0,0,1);
+  R2Pixel green(0,255,0,1);
+  
+  Temp1.Harris(2);
+  
+  int feature[5][150];//store the coordinates of the features on image1 and the matching features in the other image
+  memset(feature,0,sizeof(int)*5*150);//set all array values to zero
+  float max;
+  int max_x,max_y;
+  
+  int w = width*0.1;//search window half width
+  int h = height*0.1;//search window half height
+  int bx,by;
+  float ssd,mssd;
+  int mx,my;
+  int wstart, wend, hstart, hend;
+
+  //feature search on image 1 and store the coordinate in the feature array
+  for(int n=0;n<150;n++){
+    max = pValue(Temp1.Pixel(10,10));
+    
+    for(int i=10;i<width-10;i++){
+      for(int j=10;j<height-10;j++){
+	 
+	if (pValue(Temp1.Pixel(i,j)) >= max){
+	  max = pValue(Temp1.Pixel(i,j));
+	  max_x = i;
+	  max_y = j;
+	}
+      }
+    }
+    
+    for(int dx = -15;dx<=15;dx++){
+      for(int dy=-15;dy<=15;dy++){
+	Temp1.Pixel(max_x+dx,max_y+dy)=black;//black out the surrounding area
+	
+      }
+    }
+    feature[0][n]=max_x;
+    feature[1][n]=max_y;
+    
+    for(int k1=-5;k1<=5;k1++){
+      for(int k2=-5;k2<=5;k2++){
+	Pixel(max_x+k1,max_y+k2)=green;//draw filled boxes around the found features on image 1
+      }
+    }
+  }
+  
+  //do local search for each feature on the other image
+  for(int l=0;l<150;l++){
+  
+    bx=feature[0][l];
+    by=feature[1][l];
+  
+    wstart = bx-w;//x coordinate of the search window's left edge
+    if(wstart<3){
+      wstart=3;
+    }
+  
+    wend = bx+w;//x coordinate of the search window's right edge
+    if(wend>width-4){
+      wend=width-4;
+    }
+  
+    hstart =by-h;//y coordinate of the search window's bottom edge
+    if(hstart<3){
+      hstart=3;
+    }
+  
+    hend = by+h;//y coordinate of the search window's top edge
+    if(hend>height-4){
+      hend=height-4;
+    }
+    
+    mssd=10000000000000; //initiate the minimum ssd to a large value
+  
+    for(int sw=wstart;sw<wend;sw++){
+      for(int sh=hstart;sh<hend;sh++){
+	ssd=0;//reset the ssd value for each pair of pixels to be compared
+      
+	for(int m=-3;m<=3;m++){//for each pair of pixels, compare the ssd of a 7*7 window
+	  for(int n=-3;n<=3;n++){
+	    float dif = SSD(Temp2.Pixel(bx+m,by+n),otherImage->Pixel(sw+m,sh+n));
+	    ssd += dif;
+	  }
+	}
+      
+	if(ssd<mssd)
+	  {//set the minimum ssd to the current smallest ssd and store the x,y coordinates with mx, my
+	    mssd=ssd;
+	    mx=sw;
+	    my=sh;
+	  }
+      
+      }
+    }
+  
+    feature[2][l]=mx;//store the best location within the search window
+    feature[3][l]=my;
+  
+  }
+
+  int r = 0;
+  int x1,y1,x2,y2,target;
+  int inCount;//cross product and count of inliers
+  int thr=0;
+  float sim,base;
+
+ 
+  while(r<150){
+    
+    int v = rand() % 150; //randomly choose a motion vector
+    x1 = feature[2][v]-feature[0][v];
+    y1 = feature[3][v]-feature[1][v];
+    inCount = 0;
+    
+    for(int z=0;z<150;z++){//loop through all the motion vectors to count the inliers
+      x2 = feature[2][z]-feature[0][z];
+      y2 = feature[3][z]-feature[1][z];
+      sim =sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));//calculate the distance between two motion vectors
+    
+      if(sim<=6){
+	inCount++;
+      }
+    }
+
+    if(inCount>thr){
+      target = v;
+      thr = inCount;
+    }
+    r++;
+  }
+  
+  
+  result[0] = feature[2][target]-feature[0][target]; //store dx,dy to result;
   result[1] = feature[3][target]-feature[1][target];
+
+  /*
+  x1 = feature[2][target]-feature[0][target]; //store dx,dy to result;
+  y1 = feature[3][target]-feature[1][target];
+  */
+  
   //cout<<"target:"<<target;
   /*
   for(int z=0;z<150;z++){//redraw the translation line
@@ -1039,11 +1220,10 @@ RansacT(R2Image * otherImage, double result[2])
     }
   }
   */
-   
   
- 
 }
- 
+
+
 void R2Image::
 RansacP(R2Image * otherImage)
 {
