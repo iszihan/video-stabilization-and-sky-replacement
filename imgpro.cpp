@@ -31,7 +31,6 @@
 
 
 // Program arguments
-
 static char options[] =
 "  -help\n"
 "  -svdTest\n"
@@ -49,9 +48,9 @@ static char options[] =
 "  -matchTranslation <file:other_image>\n"
 "  -RANSACP <file:other_image>\n"
 "  -RANSACT <file:other_image>\n"
+"  -RANSAC <file:other_image>\n"
 "  -matchHomography <file:other_image>\n"
-"  -video\n"
-"  -videostabilization <real:sigma>\n";
+"  -video\n";
 
 
 
@@ -152,57 +151,45 @@ main(int argc, char **argv)
 
       char inputName[100] = "videoinput/backyard/%07d.jpg";
       char outputName[100] = "videooutput/backyard/by%07d.jpg";
+      //char tempoutputName[100] ="videooutput/backyard/test%07d.jpg";
 
       R2Image *mainImage = new R2Image();
-      char mainFilename[100];
       char currentFilename[100];
       char currentOutputFilename[100];
-      double dxList[150];
-      double dyList[150];
-
-      
+      //char tempOutputFilename[100];
+     
       if (!mainImage) {
 	fprintf(stderr, "Unable to allocate image\n");
 	exit(-1);
       }
-      ///*
+      
       // read very first frame
       sprintf(currentFilename, inputName, 0);
-      //sprintf(currentOutputFilename, outputName, 0);
       
       if (!mainImage->Read(currentFilename)) {
 	fprintf(stderr, "Unable to read first image\n");
 	exit(-1);
       }
-      //*/
+      
 
       // =============== VIDEO PROCESSING ===============
 
-      //mainImage->featureDetect();
-      //mainImage->Write(currentOutputFilename);
-      //here you could call mainImage->FirstFrameProcessing( ); 
-		
-      int end = 5;
-      for (int i = 1; i < end; i++)
+      //store the dx, dy motion vector frame by frame 
+      double result[2];
+      int end = 201;
+      double dxList[300];
+      double dyList[300];
+      dxList[0]=0;
+      dyList[0]=0;
+      for (int i = 1; i <= end; i++)
 	{
-	  /* 
-	  sprintf(mainFilename, inputName, 0);
-	  //sprintf(currentOutputFilename, outputName, 0);
-      
-	  if (!mainImage->Read(mainFilename)) {
-	    fprintf(stderr, "Unable to read first image\n");
-	    exit(-1);
-	  }
-	  */
-	  
+	  //read current frame
 	  R2Image *currentImage = new R2Image();
 	  if (!currentImage) {
 	    fprintf(stderr, "Unable to allocate image %d\n",i);
 	    exit(-1);
 	  }
-
 	  sprintf(currentFilename, inputName, i);
-	  sprintf(currentOutputFilename, outputName, i);
 			
 	  printf("Processing file %s\n", currentFilename);
 	  if (!currentImage->Read(currentFilename)) {
@@ -211,43 +198,75 @@ main(int argc, char **argv)
 	  }
 
 	  //process frames
-	  double result[2];
 	  mainImage->RansacT(currentImage,result);
-	  dxList[i-1]=result[0]; //store the corresponding dx,dy 
-	  dyList[i-1]=result[1];
+	  dxList[i]=result[0]; //store the corresponding dx,dy 
+	  dyList[i]=result[1];
 	  
-	  //write result to file	 
-	  if (!currentImage->Write(currentOutputFilename)) {
-	    fprintf(stderr, "Unable to write %s\n", currentOutputFilename);
-	    exit(-1);
-	  }
-	  //*/
-	  mainImage = currentImage;
+	  mainImage->Read(currentFilename);//replace as the previous frame
 	  delete currentImage;
 	}
       
-      for(int i=0;i<150;i++){
+      for(int i=0;i<=end;i++){
 	printf("dx=%f, dy=%f",dxList[i],dyList[i]);
       }
 
       
-      //smooth the dx-dy curve
+      //smooth the dx,dy accumlated curve and store it in the new lists
       double dxSum = 0;
       double dySum = 0;
-      for(int i=0;i<end;i++){
-	dxSum += dxList[i];
-	dySum += dyList[i];
-      }
+      /*
       double avgdx = dxSum/end;
       double avgdy = dySum/end;
+      printf("avgdx=%f, avgdy=%f",avgdx,avgdy);
+      */
+      double dx_ws, dy_ws;
+      double dx_accList[300];
+      double dy_accList[300];
+      double dx_nList[300];
+      double dy_nList[300];
+      for(int i=0;i<=end;i++){
+	dxSum += dxList[i];
+	dySum += dyList[i];
+	dx_accList[i]=dxSum;
+	dy_accList[i]=dySum;
+      }
 
-     
-     
+      for(int i=0;i<=end;i++){
+	for(int j=-3;j<=3;j++){//average using a sliding window of length 7 
+	  dx_ws =0;
+	  dy_ws =0;
+	  if(i+j<0){
+	    dx_ws += dx_accList[-i-j];
+	    dy_ws += dy_accList[-i-j];
+	  }
+	  else if(i+j>=0 && i+j<=end){
+	    dx_ws += dx_accList[i+j];
+	    dy_ws += dy_accList[i+j];
+	  }
+	  else if(i+j>end){
+	    dx_ws += dx_accList[2*end-i-j];
+	    dy_ws += dy_accList[2*end-i-j];
+	     
+	  }
+	}
+	dx_nList[i]=dx_ws/7;
+	dy_nList[i]=dy_ws/7;
+	
+      }
 
-      for(int i=1;i<end;i++){
-
-	double difx= avgdx-dxList[i-1];
-	double dify= avgdy-dyList[i-1]; //generate the new transform dx,dy;
+      /*
+      double dx_acc=0;
+      double dy_acc=0;
+      */
+      for(int i=0;i<=end;i++){
+	/*
+	dx_acc+=dxList[i];
+	dy_acc+=dyList[i];
+	*/
+	
+	double difx= dx_nList[i]-dx_accList[i];
+	double dify= dy_nList[i]-dy_accList[i]; //generate the new transform dx,dy;
+	
         R2Image *currentImage = new R2Image();
 	if (!currentImage) {
 	  fprintf(stderr, "Unable to allocate image %d\n",i);
@@ -261,6 +280,7 @@ main(int argc, char **argv)
 	    fprintf(stderr, "Unable to read image %d\n", i);
 	    exit(-1);
 	  }
+	  
 	  currentImage->Translate(difx,dify);
 	  if (!currentImage->Write(currentOutputFilename)) {
 	    fprintf(stderr, "Unable to write %s\n", currentOutputFilename);
@@ -349,6 +369,13 @@ main(int argc, char **argv)
       R2Image *other_image = new R2Image(argv[1]);
       argv += 2, argc -= 2;
       image->RansacP(other_image);
+      delete other_image;
+    }
+    else if (!strcmp(*argv, "-RANSAC")) {
+      CheckOption(*argv, argc, 2);
+      R2Image *other_image = new R2Image(argv[1]);
+      argv += 2, argc -= 2;
+      image->Ransac(other_image);
       delete other_image;
     }
     else if (!strcmp(*argv, "-matchHomography")) {
