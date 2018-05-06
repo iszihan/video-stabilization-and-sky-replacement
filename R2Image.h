@@ -82,6 +82,7 @@ class R2Image {
   void featureDetect();
 
   // further operations
+  void Ransac(R2Image * otherImage);
   void RansacP(R2Image * otherImage);
   void RansacT(R2Image * otherImage, double result[2]);
   void blendOtherImageTranslated(R2Image * otherImage);
