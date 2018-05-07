@@ -63,6 +63,7 @@ class R2Image {
   void Brighten(double factor);
   void ChangeSaturation(double factor);
   void Translate(double dx, double dy);
+  void Crop(int lx, int rx, int ty, int by);
 
   // show how SVD works
  void svdTest();

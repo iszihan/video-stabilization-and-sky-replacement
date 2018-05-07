@@ -264,6 +264,24 @@ double** dlt(double** N)
 // Per-pixel Operations ////////////////////////////////////////////////
 
 void R2Image::
+Crop(int lx, int rx, int ty, int by){
+  R2Image Temp(*this);
+ 
+  for(int i = 0;i<width;i++){
+    for(int j = 0;j<height;j++){
+      if(i<lx | i>width-rx | j<by | j>height-ty){
+	Pixel(i,j)=R2black_pixel;
+      }else{
+	 Pixel(i,j)=Temp.Pixel(i,j);
+      }
+     
+    }
+  }
+  
+}
+
+
+void R2Image::
 Translate(double dx, double dy){
 
   R2Image Temp(*this);

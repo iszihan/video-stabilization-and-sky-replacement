@@ -151,6 +151,7 @@ main(int argc, char **argv)
 
       char inputName[100] = "videoinput/backyard/%07d.jpg";
       char outputName[100] = "videooutput/backyard/by%07d.jpg";
+      char croppedoutput[100] = "videooutput/backyard/cropped%07d.jpg";
       //char tempoutputName[100] ="videooutput/backyard/test%07d.jpg";
 
       R2Image *mainImage = new R2Image();
@@ -176,7 +177,7 @@ main(int argc, char **argv)
 
       //store the dx, dy motion vector frame by frame 
       double result[2];
-      int end = 201;
+      int end = 35;
       double dxList[300];
       double dyList[300];
       dxList[0]=0;
@@ -214,11 +215,7 @@ main(int argc, char **argv)
       //smooth the dx,dy accumlated curve and store it in the new lists
       double dxSum = 0;
       double dySum = 0;
-      /*
-      double avgdx = dxSum/end;
-      double avgdy = dySum/end;
-      printf("avgdx=%f, avgdy=%f",avgdx,avgdy);
-      */
+      
       double dx_ws, dy_ws;
       double dx_accList[300];
       double dy_accList[300];
@@ -254,18 +251,28 @@ main(int argc, char **argv)
 	
       }
 
-      /*
-      double dx_acc=0;
-      double dy_acc=0;
-      */
+      int mindifx=0;
+      int mindify=0;
+      int maxdifx=0;
+      int maxdify=0;
+      
       for(int i=0;i<=end;i++){
-	/*
-	dx_acc+=dxList[i];
-	dy_acc+=dyList[i];
-	*/
-	
+
 	double difx= dx_nList[i]-dx_accList[i];
-	double dify= dy_nList[i]-dy_accList[i]; //generate the new transform dx,dy;
+	if(difx<mindifx){
+	  mindifx = int(difx);
+	}
+	if(difx>maxdifx){
+	  maxdifx = int(difx);
+	}
+	double dify= dy_nList[i]-dy_accList[i];
+	if(dify<mindify){
+	  mindify = int(dify);
+	}
+	if(dify>maxdify){
+	  maxdify = int(dify);
+	}//generate the new transform dx,dy and store the max, min for cropping later;
+	
 	
         R2Image *currentImage = new R2Image();
 	if (!currentImage) {
@@ -288,6 +295,35 @@ main(int argc, char **argv)
 	  }
 	  delete currentImage;
       }
+
+      for(int i=0;i<=end;i++){
+
+	
+        R2Image *currentImage = new R2Image();
+	if (!currentImage) {
+	  fprintf(stderr, "Unable to allocate image %d\n",i);
+	  exit(-1);
+	}
+
+	sprintf(currentFilename, outputName, i);
+	sprintf(currentOutputFilename, croppedoutput, i);
+	printf("Crop file %s\n", currentFilename);
+	  if (!currentImage->Read(currentFilename)) {
+	    fprintf(stderr, "Unable to read image %d\n", i);
+	    exit(-1);
+	  }
+	  
+	  currentImage->Crop(maxdifx,-mindifx,-mindify,maxdify);
+	  if (!currentImage->Write(currentOutputFilename)) {
+	    fprintf(stderr, "Unable to write %s\n", currentOutputFilename);
+	    exit(-1);
+	  }
+
+	  delete currentImage;
+      }
+
+
+      
       // Return success
       return EXIT_SUCCESS;
     }
