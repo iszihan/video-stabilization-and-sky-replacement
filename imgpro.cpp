@@ -50,7 +50,8 @@ static char options[] =
 "  -RANSACT <file:other_image>\n"
 "  -RANSAC <file:other_image>\n"
 "  -matchHomography <file:other_image>\n"
-"  -video\n";
+"  -videostabilization\n"
+"  -sky\n";
 
 
 
@@ -146,18 +147,111 @@ main(int argc, char **argv)
       image->svdTest();
       return 0;
     }
-    else if (!strcmp(argv[i], "-video")) {
+    else if (!strcmp(argv[i], "-sky")) {
       printf("Video processing started\n");
 
       char inputName[100] = "videoinput/backyard/%07d.jpg";
-      char outputName[100] = "videooutput/backyard/by%07d.jpg";
-      char croppedoutput[100] = "videooutput/backyard/cropped%07d.jpg";
-      //char tempoutputName[100] ="videooutput/backyard/test%07d.jpg";
+      char skyinputName[100] = "videoinput/sky.jpg";
+      char outputName[100] = "videooutput/backyard/skyreplacement/by%07d.jpg";
+      char skyoutputName[100]="videooutput/backyard/skyreplacement/warpedsky%07d.jpg";
+      
+      R2Image *mainImage = new R2Image();
+      R2Image *mainSkyImage = new R2Image();
+      char currentFilename[100];
+      char currentOutputFilename[100];
+      char currentSkyFilename[100];
+      char currentSkyOutputFilename[100];
+      int end = 201;
+      double feature[5][300];
+      int fsize = 300;
+      memset(feature,0,sizeof(int)*5*300);
+      
+      sprintf(currentFilename, inputName, 0);
+      sprintf(currentOutputFilename,outputName,0);
+      if (!mainImage->Read(currentFilename)) {
+	fprintf(stderr, "Unable to read first image\n");
+	exit(-1);
+      }
+      printf("Processing the main frame %s\n", currentFilename);
+      mainImage->featureDetect(feature,fsize);
+      //testing
+      for(int i=0;i<fsize;i++){
+	printf("The %dth feature x is %f, y is %f\n",i,feature[0][i],feature[1][i]);
+      }
+      mainImage->Write(currentOutputFilename);
+      
+      //processing all frames: find the good features 
+      for (int i = 1; i <= end; i++)
+	{
+	  //read the mainImage as the first frame  
+	  sprintf(currentFilename, inputName, 0);
+	  if (!mainImage->Read(currentFilename)) {
+	    fprintf(stderr, "Unable to read first image\n");
+	    exit(-1);
+	  }
 
+	  //read current frame
+	  R2Image *currentImage = new R2Image();
+	  sprintf(currentFilename, inputName, i);
+	  sprintf(currentOutputFilename, outputName,i);
+	  printf("Finding the features in %s\n", currentFilename);
+	  currentImage->Read(currentFilename);
+	  
+	  //process frames to find the good features
+	  mainImage->RansacP(currentImage,feature,fsize);
+	  // mainImage->Write(currentOutputFilename);
+	  for(int j=0;j<fsize;j++){
+	    printf("The %dth feature is %f.\n",j,feature[4][j]);
+	  }  
+	  delete currentImage;
+	}
+      
+      //refine the transformation matrix and warp the sky image accordingly 
+      for(int i=1;i<=end;i++)
+	{
+	  //read the orginal sky image
+	  sprintf(currentSkyFilename,skyinputName);
+	  mainSkyImage->Read(currentSkyFilename);
+	  sprintf(currentSkyOutputFilename, skyoutputName, i);
+	  
+	  //read the mainImage as the first frame  
+	  sprintf(currentFilename, inputName, 0);
+	  if (!mainImage->Read(currentFilename)) {
+	    fprintf(stderr, "Unable to read first image\n");
+	    exit(-1);
+	  }
+	  
+	  //read current frame
+	  R2Image *currentImage = new R2Image();
+	  sprintf(currentFilename, inputName, i);
+	  sprintf(currentOutputFilename, outputName,i);
+	  currentImage->Read(currentFilename);
+	  
+	  //recalculate the matrix
+	  printf("Finding the matrix in %s.\n",currentFilename);
+	  double result[3][3];
+	  mainImage->PMatrix(currentImage,result,feature,fsize);
+	  mainImage->Write(currentOutputFilename);
+	   
+	  //warp the sky image accordingly
+	  printf("Warping the sky image according to %s\n", currentFilename);
+	  mainSkyImage->warp(currentImage,result);	  
+	  mainSkyImage->Write(currentSkyOutputFilename);
+
+	  delete currentImage;
+	}
+      return EXIT_SUCCESS;
+    }
+    else if (!strcmp(argv[i], "-videostabilization")) {
+      printf("Video stabilization processing started\n");
+
+      char inputName[100] = "videoinput/table/%07d.jpg";
+      char outputName[100] = "videooutput/table/tb_stb%07d.jpg";
+      char croppedoutput[100] = "videooutput/table/cropped%07d.jpg";
+      
       R2Image *mainImage = new R2Image();
       char currentFilename[100];
       char currentOutputFilename[100];
-      //char tempOutputFilename[100];
      
       if (!mainImage) {
 	fprintf(stderr, "Unable to allocate image\n");
@@ -177,7 +271,7 @@ main(int argc, char **argv)
 
       //store the dx, dy motion vector frame by frame 
       double result[2];
-      int end = 35;
+      int end = 149;
       double dxList[300];
       double dyList[300];
       dxList[0]=0;
@@ -321,9 +415,6 @@ main(int argc, char **argv)
 
 	  delete currentImage;
       }
-
-
-      
       // Return success
       return EXIT_SUCCESS;
     }
@@ -398,13 +489,6 @@ main(int argc, char **argv)
       R2Image *other_image = new R2Image(argv[1]);
       argv += 2, argc -= 2;
       image->blendOtherImageTranslated(other_image);
-      delete other_image;
-    }
-    else if (!strcmp(*argv, "-RANSACP")) {
-      CheckOption(*argv, argc, 2);
-      R2Image *other_image = new R2Image(argv[1]);
-      argv += 2, argc -= 2;
-      image->RansacP(other_image);
       delete other_image;
     }
     else if (!strcmp(*argv, "-RANSAC")) {

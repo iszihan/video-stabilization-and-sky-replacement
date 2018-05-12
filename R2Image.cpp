@@ -135,6 +135,7 @@ svdTest()
   int n=4;
   int n2=2*n;
   int coord [6][n];
+  
   //pass input for the coordinates of point correspondences
   for(int i=1;i<=n;i++){
     cout<<"Please enter the x coordinate of your "<<i<<"th point in image 1.";
@@ -194,11 +195,10 @@ svdTest()
 }
 
 
-double** dlt(double** N)
+double** dlt(double** N, int size)
 {
  
-  int n = 4;
-  int n2 = 2*n;
+  int n2 = 2*size;
 
   // build the 2nx9 matrix of equations
   double** linEquations = dmatrix(1,n2,1,9);
@@ -232,14 +232,14 @@ double** dlt(double** N)
     svdcmp(linEquations, n2, 9, singularValues, nullspaceMatrix);
 
     // get the result
-    //printf("\n Singular values: %f, %f, %f, %f, %f, %f, %f, %f, %f\n",singularValues[1],singularValues[2],singularValues[3],singularValues[4],singularValues[5],singularValues[6],singularValues[7],singularValues[8],singularValues[9]);
+    printf("\n Singular values: %f, %f, %f, %f, %f, %f, %f, %f, %f\n",singularValues[1],singularValues[2],singularValues[3],singularValues[4],singularValues[5],singularValues[6],singularValues[7],singularValues[8],singularValues[9]);
 
     // find the smallest singular value:
     int smallestIndex = 1;
     for(int i=2;i<10;i++) if(singularValues[i]<singularValues[smallestIndex]) smallestIndex=i;
 
     // solution is the nullspace of the matrix, which is the column in V corresponding to the smallest singular value (which should be 0)
-    //printf("Singular vector that gives H: %f, %f, %f, %f, %f, %f, %f, %f, %f\n",nullspaceMatrix[1][smallestIndex],nullspaceMatrix[2][smallestIndex],nullspaceMatrix[3][smallestIndex],nullspaceMatrix[4][smallestIndex],nullspaceMatrix[5][smallestIndex],nullspaceMatrix[6][smallestIndex],nullspaceMatrix[7][smallestIndex],nullspaceMatrix[8][smallestIndex],nullspaceMatrix[9][smallestIndex]);
+    printf("Singular vector that gives H: %f, %f, %f, %f, %f, %f, %f, %f, %f\n",nullspaceMatrix[1][smallestIndex],nullspaceMatrix[2][smallestIndex],nullspaceMatrix[3][smallestIndex],nullspaceMatrix[4][smallestIndex],nullspaceMatrix[5][smallestIndex],nullspaceMatrix[6][smallestIndex],nullspaceMatrix[7][smallestIndex],nullspaceMatrix[8][smallestIndex],nullspaceMatrix[9][smallestIndex]);
     
     double** H = dmatrix(1,3,1,3);
     H[1][1]=nullspaceMatrix[1][smallestIndex];
@@ -265,6 +265,7 @@ double** dlt(double** N)
 
 void R2Image::
 Crop(int lx, int rx, int ty, int by){
+  
   R2Image Temp(*this);
  
   for(int i = 0;i<width;i++){
@@ -640,7 +641,7 @@ double pValue(R2Pixel n){
 }
 
 void R2Image::
-featureDetect(){
+featureDetect(double feature[5][300],int fsize){
   
   R2Image Temp(*this);
   R2Pixel red(255,0,0,1);
@@ -651,9 +652,10 @@ featureDetect(){
   int max_x;
   int max_y;
   
-  for(int n=1;n<=150;n++){
+  for(int n=0;n<fsize;n++){
     max = pValue(black);
     
+    //find the feature with maximum pValue 
     for(int i=10;i<width-10;i++){
       for(int j=10;j<height-10;j++){
 	double v = pValue(Temp.Pixel(i,j));
@@ -665,20 +667,24 @@ featureDetect(){
       }
     }
     
+    //store the location in the feature array
+    feature[0][n]=max_x;
+    feature[1][n]=max_y;
+    
+    //black out the surround area so that each feature is 20 pixels away from each other 
     for(int dx = -20;dx<=20;dx++){
       for(int dy=-20;dy<=20;dy++){
 	Temp.Pixel(max_x+dx,max_y+dy)=black;
       }
     }
-    
-    for(int k=-5;k<=5;k++){
-      for (int l=-5; l<=5; l++){
-	Pixel(max_x+k,max_y+l)=red;
-     
+
+    for(int i=-5;i<=5;i++){
+      for(int j=-5;j<=5;j++){
+	Pixel(max_x+i,max_y+j)=red;
       }
     }
+    
   }
-
 }
 
 
@@ -942,12 +948,12 @@ Ransac(R2Image * otherImage)
     }
     feature[0][n]=max_x;
     feature[1][n]=max_y;
-    
+    /*
     for(int k1=-5;k1<=5;k1++){
       for(int k2=-5;k2<=5;k2++){
 	Pixel(max_x+k1,max_y+k2)=green;//draw filled boxes around the found features on image 1
       }
-    }
+    }*/
   }
   
   //do local search for each feature on the other image
@@ -1004,6 +1010,21 @@ Ransac(R2Image * otherImage)
   
   }
 
+  for(int i=0;i<width;i++){
+    for(int j=0;j<height;j++){
+      Pixel(i,j)=otherImage->Pixel(i,j);
+    }
+  }
+
+  for(int z=0;z<150;z++){
+    for(int h1=-5;h1<=5;h1++){
+      for(int h2=-5;h2<=5;h2++){
+	Pixel(feature[2][z]+h1,feature[3][z]+h2)=R2black_pixel;//draw filled boxes around these features
+      }
+    }
+  }
+  
+  /*
   int r = 0;
   int x1,y1,x2,y2,target;
   int inCount;//cross product and count of inliers
@@ -1011,19 +1032,19 @@ Ransac(R2Image * otherImage)
   float sim,base;
 
  
-  while(r<150){
+  while(r<50){
     
-    int v = rand() % 150; //randomly choose a motion vector
+    int v = rand() % 50; //randomly choose a motion vector
     x1 = feature[2][v]-feature[0][v];
     y1 = feature[3][v]-feature[1][v];
     inCount = 0;
     
-    for(int z=0;z<150;z++){//loop through all the motion vectors to count the inliers
+    for(int z=0;z<50;z++){//loop through all the motion vectors to count the inliers
       x2 = feature[2][z]-feature[0][z];
       y2 = feature[3][z]-feature[1][z];
       sim =sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));//calculate the distance between two motion vectors
     
-      if(sim<=6){
+      if(sim<=3){
 	inCount++;
       }
     }
@@ -1036,25 +1057,33 @@ Ransac(R2Image * otherImage)
   }
   
   
-  //result[0] = feature[2][target]-feature[0][target]; //store dx,dy to result;
-  //result[1] = feature[3][target]-feature[1][target];
 
-  
   x1 = feature[2][target]-feature[0][target]; //store dx,dy to result;
   y1 = feature[3][target]-feature[1][target];
 
 
   
-  //cout<<"target:"<<target;
+  for(int i=0;i<width;i++){
+    for(int j=0;j<height;j++){
+      Pixel(i,j)=otherImage->Pixel(i,j);
+    }
+  }
+ 
   
-  for(int z=0;z<150;z++){//redraw the translation line
+  for(int z=0;z<50;z++){//redraw the features
     x2 = feature[2][z]-feature[0][z];
     y2 = feature[3][z]-feature[1][z];
     sim =sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
-    cout<<sim<<' ';
+     cout<<sim<<' ';
     if(sim<=6){
-      this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],0,255,0);//draw the matching lines
+    for(int h1=-5;h1<=5;h1++){
+      for(int h2=-5;h2<=5;h2++){
+	Pixel(feature[2][z]+h1,feature[3][z]+h2)=R2black_pixel;//draw filled boxes around these inliers
+      }
     }
+    //this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],0,255,0);//draw the matching lines
+  }
+
     else{
       for(int h1=-5;h1<=5;h1++){
 	for(int h2=-5;h2<=5;h2++){
@@ -1063,9 +1092,10 @@ Ransac(R2Image * otherImage)
       }
       this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],255,0,0);//draw the matching lines
     }
-  }
-  
-}
+    }*/
+ }
+
+
 
 
 
@@ -1182,9 +1212,7 @@ RansacT(R2Image * otherImage, double result[2])
   int x1,y1,x2,y2,target;
   int inCount;//cross product and count of inliers
   int thr=0;
-  float sim,base;
-
- 
+  float sim;
   while(r<150){
     
     int v = rand() % 150; //randomly choose a motion vector
@@ -1243,28 +1271,20 @@ RansacT(R2Image * otherImage, double result[2])
 
 
 void R2Image::
-RansacP(R2Image * otherImage)
+RansacP(R2Image * otherImage, double feature[5][300], int fsize)
 {
  
   R2Image Temp1(*this);//for feature search
   R2Image Temp2(*this);//keep original image
   R2Pixel black(0,0,0,1);
   R2Pixel red(255,0,0,1);
-  R2Pixel green(0,255,0,1);
-  
+
+  //search feature on image 1
+  /*
   Temp1.Harris(1.5);
-  
-  int feature[4][150];//store the coordinates of the features on image1 and the matching features in the other image
-  memset(feature,0,sizeof(int)*4*150);//set all array values to zero
+ 
   float max;
   int max_x,max_y;
-  
-  int w = width*0.1;//search window half width
-  int h = height*0.1;//search window half height
-  int bx,by;
-  float ssd,mssd;
-  int mx,my;
-  int wstart, wend, hstart, hend;
 
   //feature search on image 1 and store the coordinate in the feature array
   for(int n=0;n<150;n++){
@@ -1295,100 +1315,108 @@ RansacP(R2Image * otherImage)
 	Pixel(max_x+k1,max_y+k2)=green;//draw filled boxes around the found features on image 1
       }
     }
+    
   }
+  */
   
   //do local search for each feature on the other image
-  for(int l=0;l<150;l++){
-  
-    bx=feature[0][l];
-    by=feature[1][l];
-  
-    wstart = bx-w;//x coordinate of the search window's left edge
-    if(wstart<3){
-      wstart=3;
-    }
-  
-    wend = bx+w;//x coordinate of the search window's right edge
-    if(wend>width-4){
-      wend=width-4;
-    }
-  
-    hstart =by-h;//y coordinate of the search window's bottom edge
-    if(hstart<3){
-      hstart=3;
-    }
-  
-    hend = by+h;//y coordinate of the search window's top edge
-    if(hend>height-4){
-      hend=height-4;
-    }
+  int bx,by;
+  float ssd,mssd;
+  int mx,my;
+  int wstart, wend, hstart, hend;
+  int w = width*0.1;  //search window half width
+  int h = height*0.1; //search window half height
+  for(int l=0;l<fsize;l++){
     
-    mssd=10000000000000; //initiate the minimum ssd to a large value
+    //if this is a good feature
+    if(feature[4][l]!=-1){
+      //location on image 1
+      bx=feature[0][l];
+      by=feature[1][l];
   
-    for(int sw=wstart;sw<wend;sw++){
-      for(int sh=hstart;sh<hend;sh++){
-	ssd=0;//reset the ssd value for each pair of pixels to be compared
-      
-	for(int m=-3;m<=3;m++){//for each pair of pixels, compare the ssd of a 7*7 window
-	  for(int n=-3;n<=3;n++){
-	    float dif = SSD(Temp2.Pixel(bx+m,by+n),otherImage->Pixel(sw+m,sh+n));
-	    ssd += dif;
-	  }
-	}
-      
-	if(ssd<mssd)
-	  {//set the minimum ssd to the current smallest ssd and store the x,y coordinates with mx, my
-	    mssd=ssd;
-	    mx=sw;
-	    my=sh;
-	  }
-      
+      wstart = bx-w;//x coordinate of the search window's left edge
+      if(wstart<3){
+	wstart=3;
       }
+  
+      wend = bx+w;//x coordinate of the search window's right edge
+      if(wend>width-4){
+	wend=width-4;
+      }
+  
+      hstart =by-h;//y coordinate of the search window's bottom edge
+      if(hstart<3){
+	hstart=3;
+      }
+  
+      hend = by+h;//y coordinate of the search window's top edge
+      if(hend>height-4){
+	hend=height-4;
+      }
+    
+      mssd=10000000000000; //initiate the minimum ssd to a large value
+  
+      for(int sw=wstart;sw<wend;sw++){
+	for(int sh=hstart;sh<hend;sh++){
+	  ssd=0;//reset the ssd value for each pair of pixels to be compared
+      
+	  for(int m=-3;m<=3;m++){//for each pair of pixels, compare the ssd of a 7*7 window
+	    for(int n=-3;n<=3;n++){
+	      float dif = SSD(Temp2.Pixel(bx+m,by+n),otherImage->Pixel(sw+m,sh+n));
+	      ssd += dif;
+	    }
+	  }
+      
+	  if(ssd<mssd)
+	    { //set the minimum ssd to the current smallest ssd and store the x,y coordinates with mx, my
+	      mssd=ssd;
+	      mx=sw;
+	      my=sh;
+	    }
+      
+	}
+      }
+      feature[2][l]=mx;//store the feature's best location in image 2 within the search window
+      feature[3][l]=my;
     }
-  
-    feature[2][l]=mx;//store the best location within the search window
-    feature[3][l]=my;
-  
   }
-
   
-  
+  //find the robost feature matches and mark the bad features off for future search
   int r = 0;
-  double x1,y1,w1,x2,y2,w2,x2_,y2_,w2_;
+  double x1,y1,w1,x2,y2,w2;
+  double x1_,y1_,w1_,x2_,y2_,w2_;
   int inCount;//count of inliers
   int thr=0;//threshold of inliers
   double sim;//similarity
-  int v [1][4];//matrix to store the randomly selected four point correspondences
+  int v[4];//matrix to store the randomly selected four point correspondences
   double** coord=dmatrix(1,6,1,4);//coordinate matrix for the four point correspondences
   double** target=dmatrix(1,3,1,3);//to store the optimal matrix
  
-  while(r<250){
+  while(r<fsize){
     
-    v[0][0] = rand() % 150; //randomly choose 4 distinct motion vectors
-    v[0][1] = rand() % 150;
-    if(v[0][1]==v[0][0]){
-      while(v[0][1]==v[0][0]){//make sure v2 is not the same as v1
-	v[0][1] = rand() % 150;
-      }
+    v[0] = rand() % fsize; //randomly choose 4 distinct motion vectors
+    while(feature[4][v[0]]==-1){
+      v[0] = rand() % fsize;
     }
-    v[0][2] = rand() % 150;
-    if(v[0][2]==v[0][1] |v[0][2]==v[0][0]){
-      while(v[0][2]==v[0][1]|v[0][2]==v[0][0]){//make sure v3 is different
-	v[0][2] = rand()%150;
-      }
-    }
-    v[0][3] = rand() % 150;
-    if(v[0][3]==v[0][2]|v[0][3]==v[0][1]|v[0][3]==v[0][0]){//make sure v4 is different
-      while(v[0][3]==v[0][2]|v[0][3]==v[0][1]|v[0][3]==v[0][0]){
-	v[0][3] = rand()%150;
-      }
-      
+    v[1] = rand() % fsize;
+    while(v[1]==v[0]|feature[4][v[1]]==-1){//make sure v2 is not the same as v1
+      v[1] = rand() % fsize;
     }
     
-    for(int y=1;y<=4;y++){//copy the randomly selected point correspondences to the the coordinate matrix
+    v[2] = rand() % fsize;
+    while(v[2]==v[1]|v[2]==v[0]|feature[4][v[2]]==-1){//make sure v3 is different
+      v[2] = rand()% fsize;
+    }
+    v[3] = rand() % fsize;
+    while(v[3]==v[2]|v[3]==v[1]|v[3]==v[0]|feature[4][v[3]]==-1){
+      v[3] = rand()%fsize;
+    }
+
+    //copy the randomly selected point correspondences to the the coordinate matrix
+    for(int y=1;y<=4;y++){
       for(int w=1;w<=2;w++){
-	int tv = v[0][y-1];
-	coord[w][y]=feature[w-1][tv];
+	int tv = v[y-1];
+	coord[w][y]=feature[w+1][tv];
 	coord[3][y]=1;
 	coord[6][y]=1;
       }
@@ -1396,18 +1424,72 @@ RansacP(R2Image * otherImage)
 
     for(int y=1;y<=4;y++){
       for(int w=4;w<=5;w++){
-	int tv = v[0][y-1];
-	coord[w][y]=feature[w-2][tv];
+	int tv = v[y-1];
+	coord[w][y]=feature[w-4][tv];
       }
     }
    
-
     //pass down the four point correspondences to DLT and solve for H
-    double** H= dmatrix(1,3,1,3);
-    H = dlt(coord);   
-
+    double** H = dmatrix(1,3,1,3);
+    H = dlt(coord,4);
+    
+    //loop through all the correspondences to count the inliers, only within the good features
     inCount = 0;
-    for(int z=0;z<150;z++){//loop through all the correspondences to count the inliers
+    for(int z=0;z<fsize;z++){
+      
+      if(feature[4][z]!=-1){
+	
+	x1 = feature[0][z];//v1's coordinates 
+	y1 = feature[1][z];
+	w1 = 1;
+      
+	x2 = feature[2][z];//v2's coordinates
+	y2 = feature[3][z];
+	w2 = 1;
+	
+      
+	//Hv2's coordinates
+	x1_=x2*H[1][1]+y2*H[1][2]+H[1][3];
+	y1_=x2*H[2][1]+y2*H[2][2]+H[2][3];
+	w1_=x2*H[3][1]+y2*H[3][2]+H[3][3];
+      
+      
+	//factor to same scale
+	x1_ /= w1_;
+	y1_ /= w1_;
+      
+	//calculate the distance between Hv1 and v2;
+	sim =sqrt((x1_-x1)*(x1_-x1)+(y1_-y1)*(y1_-y1));
+	if(sim<=3){
+	  inCount++;
+	}
+      }
+    }
+    
+    if(inCount>thr){//if the counted inliers is greater than the current threshold, store the current matrix to the target matrix
+      for(int a=1; a<=3; a++){
+	for(int b=1; b<=3; b++){
+	  target[a][b]=H[a][b];
+	 
+	}
+      }
+      //set the threshold to the new standard
+      thr = inCount;
+    }
+    r++;
+  }
+  
+  //copy the image2 to image1
+  for(int i=0;i<width;i++){
+    for(int j=0;j<height;j++){
+      Pixel(i,j)=otherImage->Pixel(i,j);
+    }
+  }
+  
+  //checked off the bad features in the feature array, draw the good ones on Image 1(currently image 2)
+  for(int z=0;z<fsize;z++){
+
+    if(feature[4][z]!=-1){
       
       x1 = feature[0][z];//v1's coordinates 
       y1 = feature[1][z];
@@ -1416,62 +1498,268 @@ RansacP(R2Image * otherImage)
       x2 = feature[2][z];//v2's coordinates
       y2 = feature[3][z];
       w2 = 1;
-
-      x2_=x1*H[1][1]+y1*H[1][2]+H[1][3];//Hv1's coordinates
-      y2_=x1*H[2][1]+y1*H[2][2]+H[2][3];
-      w2_=x1*H[3][1]+y1*H[3][2]+H[3][3];
-      //factor to same scale
-      x2_ /= w2_;
-      y2_ /= w2_;
-      //cout<<"x2,x2_:"<<x2<<","<<x2_<<' ';
-      
-      sim =sqrt((x2_-x2)*(x2_-x2)+(y2_-y2)*(y2_-y2));//calculate the distance between Hv1 and v2;
-      //cout<<sim<<"&";
-      
-      if(sim<=6){
-	inCount++;
-      }
-    }
     
-    if(inCount>thr){//if the counted inliers is greater than the current threshold, store the current matrix to the target matrix
-      for(int a=1; a<=3; a++){
-	for(int b=1; b<=3; b++){
-	  target[a][b]=H[a][b];
-	}
+      /*
+	x2_=x1*target[1][1]+y1*target[1][2]+target[1][3];//Hv1's coordinates
+	y2_=x1*target[2][1]+y1*target[2][2]+target[2][3];
+	w2_=x1*target[3][1]+y1*target[3][2]+target[3][3];
+	x2_ /= w2_;
+	y2_ /= w2_;
+      */
+
+      //Hv2's coordinates
+      x1_=x2*target[1][1]+y2*target[1][2]+target[1][3];
+      y1_=x2*target[2][1]+y2*target[2][2]+target[2][3];
+      w1_=x2*target[3][1]+y2*target[3][2]+target[3][3];
+      
+      //factor to same scale
+      x1_ /= w1_;
+      y1_ /= w1_;
+      
+      sim =sqrt((x1_-x1)*(x1_-x1)+(y1_-y1)*(y1_-y1));//calculate the distance between Hv1 and v2;
+
+      if(sim<=3){
+	//mark on good features
+	feature[4][z]=1;
+	for(int i=-5;i<=5;i++){
+	  for(int j=-5;j<=5;j++){
+	    Pixel(feature[2][z]+i,feature[3][z]+j)=red;
+	  }
+	}//draw the feature boxes
       }
-      thr = inCount;//set the threshold to the new standard
+      else{
+	feature[4][z]=-1;
+      }
     }
-    r++;
   }
   
   
-  for(int z=0;z<150;z++){//redraw the translation line
-    x1 = feature[0][z];//v1's coordinates 
-    y1 = feature[1][z];
-    w1 = 1;
-      
-    x2 = feature[2][z];//v2's coordinates
-    y2 = feature[3][z];
-    w2 = 1;
+}
+
+
+void R2Image::
+PMatrix(R2Image * otherImage, double result[3][3], double feature[5][300], int fsize)
+{
+  
+  R2Image Temp1(*this);//for feature search
+  R2Image Temp2(*this);//keep original image
+  R2Pixel black(0,0,0,1);
+  R2Pixel red(255,0,0,1);
+  
+   
+  //do local search for each already good feature on the other image
+  int bx,by;
+  float ssd,mssd;
+  int mx,my;
+  int wstart, wend, hstart, hend;
+  int w = width*0.1;  //search window half width
+  int h = height*0.1; //search window half height
+  int gfsize=0; //good feature size
     
-    x2_=x1*target[1][1]+y1*target[1][2]+target[1][3];//Hv1's coordinates
-    y2_=x1*target[2][1]+y1*target[2][2]+target[2][3];
-    w2_=x1*target[3][1]+y1*target[3][2]+target[3][3];
-    x2_ /= w2_;
-    y2_ /= w2_;
+  for(int l=0;l<fsize;l++){
+    
+    //if this is a good feature
+    if(feature[4][l]!=-1){
       
-    sim =sqrt((x2_-x2)*(x2_-x2)+(y2_-y2)*(y2_-y2));//calculate the distance between Hv1 and v2;
-    //cout<<sim<<' ';
-    if(sim<=6){
-      this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],0,255,0);//draw the matching lines
-    }
-    else{
-      for(int h1=-5;h1<=5;h1++){
-	for(int h2=-5;h2<=5;h2++){
-	  Pixel(feature[0][z]+h1,feature[1][z]+h2)=red;//draw filled boxes around these outliers
+      gfsize += 1;
+      //location on image 1
+      bx=feature[0][l];
+      by=feature[1][l];
+  
+      wstart = bx-w;//x coordinate of the search window's left edge
+      if(wstart<3){
+	wstart=3;
+      }
+  
+      wend = bx+w;//x coordinate of the search window's right edge
+      if(wend>width-4){
+	wend=width-4;
+      }
+  
+      hstart =by-h;//y coordinate of the search window's bottom edge
+      if(hstart<3){
+	hstart=3;
+      }
+  
+      hend = by+h;//y coordinate of the search window's top edge
+      if(hend>height-4){
+	hend=height-4;
+      }
+    
+      mssd=10000000000000; //initiate the minimum ssd to a large value
+  
+      for(int sw=wstart;sw<wend;sw++){
+	for(int sh=hstart;sh<hend;sh++){
+	  ssd=0;//reset the ssd value for each pair of pixels to be compared
+      
+	  for(int m=-3;m<=3;m++){//for each pair of pixels, compare the ssd of a 7*7 window
+	    for(int n=-3;n<=3;n++){
+	      float dif = SSD(Temp2.Pixel(bx+m,by+n),otherImage->Pixel(sw+m,sh+n));
+	      ssd += dif;
+	    }
+	  }
+      
+	  if(ssd<mssd)
+	    { //set the minimum ssd to the current smallest ssd and store the x,y coordinates with mx, my
+	      mssd=ssd;
+	      mx=sw;
+	      my=sh;
+	    }
+      
 	}
       }
-      this->line(feature[0][z],feature[2][z],feature[1][z],feature[3][z],255,0,0);//draw the matching lines
+      feature[2][l]=mx;//store the feature's best location in image 2 within the search window
+      feature[3][l]=my;
+    }
+  }
+  
+  printf("The number of good features is %d.\n",gfsize);
+  
+  //find the best transformation matrix
+  double** coord=dmatrix(1,6,1,gfsize);
+
+  //copy the good features to the coordinate matrix
+  int count = 0;
+  for(int i = 0; i<fsize;i++){
+    if(feature[4][i]!=-1){
+      count += 1;
+      coord[1][count]=feature[2][i];
+      coord[2][count]=feature[3][i];
+      coord[3][count]=1;
+      coord[4][count]=feature[0][i];
+      coord[5][count]=feature[1][i];
+      coord[6][count]=1;
+    }
+  }
+
+  
+  //pass down the point correspondences to DLT and solve for H
+  double** H = dmatrix(1,3,1,3);
+  H = dlt(coord,gfsize);
+
+  //copy H to the result matrix
+  for(int i=0;i<3;i++){
+    for(int j=0;j<3;j++){
+      result[i][j]=H[i+1][j+1];
+    }
+  }
+
+  /*
+  int r = 0;
+  double x1,y1,w1,x2,y2,w2;
+  double x1_,y1_,w1_,x2_,y2_,w2_;
+  int inCount;//count of inliers
+  int thr=0;//threshold of inliers
+  double sim;//similarity
+  int v[4];//matrix to store the randomly selected four point correspondences
+  double** coord=dmatrix(1,6,1,4);//coordinate matrix for the four point correspondences
+  double** target=dmatrix(1,3,1,3);//to store the optimal matrix
+ 
+  while(r<fsize){
+    
+    v[0] = rand() % fsize; //randomly choose 4 distinct motion vectors and make sure to choose the good features
+    while(feature[4][v[0]]==-1){
+      v[0] = rand() % fsize;
+    }
+    v[1] = rand() % fsize;
+    while(v[1]==v[0]|feature[4][v[1]]==-1){
+      v[1] = rand() % fsize;
+    }
+    
+    v[2] = rand() % fsize;
+    while(v[2]==v[1]|v[2]==v[0]|feature[4][v[2]]==-1){
+      v[2] = rand()% fsize;
+    }
+    v[3] = rand() % fsize;
+    while(v[3]==v[2]|v[3]==v[1]|v[3]==v[0]|feature[4][v[3]]==-1){
+      v[3] = rand()% fsize;
+    }
+
+    //copy the randomly selected point correspondences to the the coordinate matrix
+    for(int y=1;y<=4;y++){
+      for(int w=1;w<=2;w++){
+	int tv = v[y-1];
+	coord[w][y]=feature[w+1][tv];
+	coord[3][y]=1;
+	coord[6][y]=1;
+      }
+    }
+
+    for(int y=1;y<=4;y++){
+      for(int w=4;w<=5;w++){
+	int tv = v[y-1];
+	coord[w][y]=feature[w-4][tv];
+      }
+    }
+   
+    //pass down the four point correspondences to DLT and solve for H
+    double** H = dmatrix(1,3,1,3);
+    H = dlt(coord);
+    
+    //loop through all the correspondences to count the inliers, only within the good features
+    inCount = 0;
+    for(int z=0;z<fsize;z++){
+      
+      if(feature[4][z]!=-1){
+	
+	x1 = feature[0][z];//v1's coordinates 
+	y1 = feature[1][z];
+	w1 = 1;
+      
+	x2 = feature[2][z];//v2's coordinates
+	y2 = feature[3][z];
+	w2 = 1;
+      
+	//Hv2's coordinates
+	x1_=x2*H[1][1]+y2*H[1][2]+H[1][3];
+	y1_=x2*H[2][1]+y2*H[2][2]+H[2][3];
+	w1_=x2*H[3][1]+y2*H[3][2]+H[3][3];
+      
+	//factor to same scale
+	x1_ /= w1_;
+	y1_ /= w1_;
+      
+	//calculate the distance between Hv1 and v2;
+	sim =sqrt((x1_-x1)*(x1_-x1)+(y1_-y1)*(y1_-y1));
+	if(sim<=3){
+	  inCount++;
+	}
+	
+      }
+      
+    }
+    
+    if(inCount>thr){//if the counted inliers is greater than the current threshold
+      //store the current matrix to the target/result matrix
+      for(int a=1; a<=3; a++){
+	for(int b=1; b<=3; b++){
+	  target[a][b]=H[a][b];
+	  result[a-1][b-1]=H[a][b];
+	}
+      }
+      //set the threshold to the new standard
+      thr = inCount;
+    }
+    r++;
+  }
+  */
+  
+  //copy Image 2 to Image 1
+  for(int i=0; i<width;i++){
+    for(int j=0;j<height;j++){
+      Pixel(i,j)=otherImage->Pixel(i,j);
+    }
+  }
+  
+  //draw the good features
+  for(int i=0;i<fsize;i++){
+    if(feature[4][i]!=-1){
+
+      for(int j=-5;j<=5;j++){
+	for(int k=-5;k<=5;k++){
+	  Pixel(feature[2][i]+j,feature[3][i]+k)=red;
+	}
+      }
     }
   }
   
@@ -1634,7 +1922,7 @@ blendOtherImageHomography(R2Image * otherImage)
 
     //pass down the four point correspondences to DLT and solve for H
     double** H= dmatrix(1,3,1,3);
-    H = dlt(coord);   
+    H = dlt(coord,4);   
 
     inCount = 0;
     for(int z=0;z<150;z++){//loop through all the correspondences to count the inliers
@@ -1751,7 +2039,7 @@ blendOtherImageHomography(R2Image * otherImage)
    
     //pass down the four point correspondences to DLT and solve for H
     double** H = dmatrix(1,3,1,3);
-    H = dlt(coord);   
+    H = dlt(coord,4);   
 
     inCount = 0;
     for(int z=0;z<thr;z++){//loop through all the robust correspondences to count the inliers
@@ -1822,6 +2110,36 @@ blendOtherImageHomography(R2Image * otherImage)
   }
 }
 
+void R2Image::
+warp(R2Image * otherImage, double H[3][3]){
+
+  R2Image Temp(*this);
+  double u_,v_,w_; //warped coordinates
+  int u1,v1;
+  
+  for(int u=0;u<width;u++){
+    for(int v=0;v<height;v++){
+    
+      u_=u*H[0][0]+v*H[0][1]+H[0][2];//Hx1's coordinates
+      v_=u*H[1][0]+v*H[1][1]+H[1][2];
+      w_=u*H[2][0]+v*H[2][1]+H[2][2];
+      u_/=w_;
+      v_/=w_;
+      
+      if(u_>=0 && u_<width && v_>=0 && v_<height){
+	u1 = int(u_+0.5);
+	v1 = int(v_+0.5);
+	R2Pixel currentframe = otherImage->Pixel(u,v);
+	currentframe *= 0.5;
+        Pixel(u,v)=0.5*Temp.Pixel(u1,v1)+currentframe; //just the warped image
+      }
+      else{
+	Pixel(u,v)=R2black_pixel;
+      }
+    }
+  }
+    
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Video-Processing functions 

@@ -80,15 +80,16 @@ class R2Image {
   //non-linear filtering
   void MedianFilter();
   void BilateralFilter();
-  void featureDetect();
+  void featureDetect(double feature[5][300],int fsize);
 
   // further operations
   void Ransac(R2Image * otherImage);
-  void RansacP(R2Image * otherImage);
+  void RansacP(R2Image * otherImage, double feature[5][300], int fsize);
+  void PMatrix(R2Image * otherImage, double result[3][3],double feature[5][300], int fsize);
   void RansacT(R2Image * otherImage, double result[2]);
   void blendOtherImageTranslated(R2Image * otherImage);
   void blendOtherImageHomography(R2Image * otherImage);
-  void FirstFrameProcessing();
+  void warp(R2Image * otherImage, double H[3][3]);
 
   // File reading/writing
   int Read(const char *filename);
