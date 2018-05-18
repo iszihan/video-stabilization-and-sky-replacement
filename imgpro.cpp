@@ -150,10 +150,10 @@ main(int argc, char **argv)
     else if (!strcmp(argv[i], "-sky")) {
       printf("Video processing started\n");
 
-      char inputName[100] = "videoinput/backyard/%07d.jpg";
-      char skyinputName[100] = "videoinput/sky.jpg";
-      char outputName[100] = "videooutput/backyard/skyreplacement/by%07d.jpg";
-      char skyoutputName[100]="videooutput/backyard/skyreplacement/warpedsky%07d.jpg";
+      char inputName[100] = "videoinput/yard/ydb%07d.jpg";
+      char skyinputName[100] = "videoinput/lightning.jpg";
+      char outputName[100] = "videooutput/yard/skyreplacement/ydb%07d.jpg";
+      char skyoutputName[100]="videooutput/yard/skyreplacement/warpedlight%07d.jpg";
       
       R2Image *mainImage = new R2Image();
       R2Image *mainSkyImage = new R2Image();
@@ -161,7 +161,7 @@ main(int argc, char **argv)
       char currentOutputFilename[100];
       char currentSkyFilename[100];
       char currentSkyOutputFilename[100];
-      int end = 201;
+      int end = 80;
       double feature[5][300];
       int fsize = 300;
       memset(feature,0,sizeof(int)*5*300);
@@ -245,9 +245,9 @@ main(int argc, char **argv)
     else if (!strcmp(argv[i], "-videostabilization")) {
       printf("Video stabilization processing started\n");
 
-      char inputName[100] = "videoinput/table/%07d.jpg";
-      char outputName[100] = "videooutput/table/tb_stb%07d.jpg";
-      char croppedoutput[100] = "videooutput/table/cropped%07d.jpg";
+      char inputName[100] = "videoinput/yard2/yd2%07d.jpg";
+      char outputName[100] = "videooutput/yard2/yd2_stb%07d.jpg";
+      char croppedoutput[100] = "videooutput/yard2/yd2_blacked%07d.jpg";
       
       R2Image *mainImage = new R2Image();
       char currentFilename[100];
@@ -271,7 +271,7 @@ main(int argc, char **argv)
 
       //store the dx, dy motion vector frame by frame 
       double result[2];
-      int end = 149;
+      int end = 140;
       double dxList[300];
       double dyList[300];
       dxList[0]=0;

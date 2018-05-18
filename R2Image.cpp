@@ -2116,6 +2116,7 @@ warp(R2Image * otherImage, double H[3][3]){
   R2Image Temp(*this);
   double u_,v_,w_; //warped coordinates
   int u1,v1;
+  float bright,yperc,sky_weight,other_weight;
   
   for(int u=0;u<width;u++){
     for(int v=0;v<height;v++){
@@ -2125,13 +2126,31 @@ warp(R2Image * otherImage, double H[3][3]){
       w_=u*H[2][0]+v*H[2][1]+H[2][2];
       u_/=w_;
       v_/=w_;
+
+      bright = (otherImage->Pixel(u,v).Red()+otherImage->Pixel(u,v).Blue()+otherImage->Pixel(u,v).Green())/3; //brightness weight
+      bright = (bright - 0.8)*5;
+      if(bright<0){
+	bright = 0;
+      }
+      if(bright>1){
+	bright = 1;
+      }
+      yperc = float(v)/float(height);
+      //if(yperc > 0.9 & bright < 0.5){
+      //	sky_weight=yperc;
+      //}else{
+	sky_weight = yperc * bright;
+	//}
+      other_weight = 1 - sky_weight;
+      //printf("For position u=%d, v=%d: The brightness weight is %f, and the y weight is %f, then the sky weight is %f.\n",u,v,bright,yperc,sky_weight);
       
       if(u_>=0 && u_<width && v_>=0 && v_<height){
 	u1 = int(u_+0.5);
 	v1 = int(v_+0.5);
+
 	R2Pixel currentframe = otherImage->Pixel(u,v);
-	currentframe *= 0.5;
-        Pixel(u,v)=0.5*Temp.Pixel(u1,v1)+currentframe; //just the warped image
+	currentframe *= other_weight;
+        Pixel(u,v)=sky_weight*Temp.Pixel(u1,v1)+currentframe; 
       }
       else{
 	Pixel(u,v)=R2black_pixel;
